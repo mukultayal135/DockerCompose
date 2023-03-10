@@ -1,0 +1,99 @@
+version: '3'
+services:
+  dbAuth:
+    container_name: dbAuth
+    image: postgres
+    volumes:
+      - ./dbauth_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: users
+    ports:
+      - '5435:5432'
+
+  dbCms:
+    container_name: dbCms
+    image: postgres
+    volumes:
+      - ./db_data_Cms:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: cms
+    ports:
+      - '5436:5432'
+
+  redis:
+    container_name: redis
+    image: redis
+    ports:
+      - '6379:6379'
+
+  serverauth:
+    build: ../Auth/
+    ports:
+      - '4000:4000'
+    depends_on:
+      - dbAuth
+    environment:
+      DB_HOST: dbAuth
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: users
+      DB_PORT: 5432
+      NODE_ENV: docker
+
+  servercms:
+    build: ../backend/
+    ports:
+      - '8000:8000'
+    depends_on:
+      - dbCms
+    environment:
+      DB_HOST: dbCms
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: cms
+      DB_PORT: 5432
+      NODE_ENV: docker
+
+  migration:
+    build:
+      context: ../Auth/
+      dockerfile: Dockerfile.migration
+    depends_on:
+      dbAuth:
+        condition: service_healthy
+    environment:
+      DB_HOST: dbAuth
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: users
+      DB_PORT: 5432
+      NODE_ENV: migration
+
+  migrationcms:
+    build:
+      context: ../backend/
+      dockerfile: Dockerfile.migration
+    depends_on:
+      dbAuth:
+        condition: service_healthy
+    environment:
+      DB_HOST: dbCms
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: cms
+      DB_PORT: 5432
+      NODE_ENV: migration
